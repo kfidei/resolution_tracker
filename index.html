@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resolution Tracker</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d29;
+    --card-hover: #20242f;
+    --accent: #6c8cff;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --text: #e6e8ef;
+    --text-dim: #9aa0b4;
+    --border: #2a2e3d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    max-width: 1000px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  .subtitle { color: var(--text-dim); margin-bottom: 20px; font-size: 14px; }
+
+  .banner {
+    background: linear-gradient(135deg, #3b2f1f, #2a2417);
+    border: 1px solid #5a4626;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: none;
+    font-size: 14px;
+  }
+  .banner.show { display: block; }
+  .banner b { color: var(--warn); }
+  .banner ul { margin: 6px 0 0 18px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-title { font-weight: 600; font-size: 15px; }
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #2a2e3d;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .card-desc { font-size: 13px; color: var(--text-dim); margin: 6px 0 10px; }
+  .card-stats { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-dim); }
+  .streak { font-weight: 700; font-size: 18px; color: var(--good); }
+  .streak.zero { color: var(--text-dim); }
+  .due-badge {
+    font-size: 11px;
+    color: var(--warn);
+    font-weight: 600;
+  }
+
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .section h2 { font-size: 16px; margin-bottom: 10px; }
+
+  textarea {
+    width: 100%;
+    background: #11141d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 70px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  select {
+    background: #11141d;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .feedback-box {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #11141d;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    display: none;
+  }
+  .feedback-box.show { display: block; }
+  .feedback-box .meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    display: flex;
+    gap: 14px;
+  }
+  .sentiment-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .sentiment-positive { background: rgba(74,222,128,0.15); color: var(--good); }
+  .sentiment-negative { background: rgba(248,113,113,0.15); color: var(--bad); }
+  .sentiment-neutral { background: rgba(154,160,180,0.15); color: var(--text-dim); }
+
+  .log-entry {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry .log-meta { color: var(--text-dim); font-size: 11px; margin-top: 4px; display: flex; gap: 10px; }
+  .log-entry .log-text { color: var(--text); }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 8px 0; }
+
+  .settings-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=password], input[type=text] {
+    background: #11141d;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .small-text { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .weekly-summary { font-size: 13px; }
+  .weekly-summary .ws-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .weekly-summary .ws-row:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<h1>🎯 Resolution Tracker</h1>
+<div class="subtitle">Set it, log it, let it nudge you. All data stays in this browser (localStorage).</div>
+
+<div class="banner" id="checkinBanner">
+  <b>Check-in due</b> — it's been a while since you logged progress on:
+  <ul id="dueList"></ul>
+</div>
+
+<div class="grid" id="resGrid"></div>
+
+<div class="section">
+  <h2>Log an update</h2>
+  <textarea id="logInput" placeholder="e.g. 'Crushed my workout tonight and was asleep by 10:30, feeling great' or 'Skipped the gym, too tired, checked accounts though'"></textarea>
+  <div class="row">
+    <select id="logResolution"></select>
+    <button onclick="submitLog()">Analyze & Log</button>
+    <span class="small-text" id="autoDetectNote"></span>
+  </div>
+  <div class="feedback-box" id="feedbackBox"></div>
+</div>
+
+<div class="section">
+  <h2>Weekly summary</h2>
+  <div class="weekly-summary" id="weeklySummary"></div>
+</div>
+
+<div class="section">
+  <h2>Recent activity</h2>
+  <div id="historyList"></div>
+</div>
+
+<div class="section">
+  <h2>Settings</h2>
+  <div class="settings-row">
+    <label style="font-size:13px; display:flex; align-items:center; gap:6px;">
+      <input type="checkbox" id="useApiToggle" style="width:auto;"> Use Claude API for richer feedback
+    </label>
+    <input type="password" id="apiKeyInput" placeholder="Anthropic API key (optional, sk-ant-...)">
+    <button class="secondary" onclick="saveSettings()">Save</button>
+  </div>
+  <div class="small-text">Without an API key, feedback is generated locally using keyword/sentiment heuristics — fast, private, free. With a key, "Analyze & Log" will also ask Claude for a short personalized reflection. Your key is stored only in this browser's localStorage and sent directly to Anthropic.</div>
+  <div class="row">
+    <button class="secondary" onclick="resetData()">Reset all data</button>
+    <button class="secondary" onclick="exportData()">Export JSON</button>
+  </div>
+</div>
+
+<script>
+// ---------- Data model ----------
+const STORAGE_KEY = 'resolutionTrackerData_v1';
+
+const DEFAULT_RESOLUTIONS = [
+  {
+    id: 'workout',
+    title: 'Daily Workout',
+    category: 'Health',
+    description: 'Complete a workout every day.',
+    frequency: 1, // days between expected check-ins
+    keywords: ['workout','gym','exercise','run','ran','lifted','lift','training session','cardio','yoga','walk','stretch'],
+    completeWords: ['did','done','completed','finished','crushed','went','smashed','nailed','hit'],
+    missWords: ['skipped','missed','didn\'t','didnt','no workout','rest day','too tired','couldn\'t','couldnt'],
+    logs: [],
+    streak: 0,
+    lastLogDate: null
+  },
+  {
+    id: 'sleep',
+    title: 'Sleep Schedule',
+    category: 'Health',
+    description: 'Fall asleep shortly after working out; awake by 9am for work.',
+    frequency: 1,
+    keywords: ['sleep','slept','asleep','bed','bedtime','woke','wake','alarm','insomnia','nap','9am','rested'],
+    completeWords: ['asleep early','slept well','woke up on time','up by 9','rested','good sleep'],
+    missWords: ['stayed up','couldn\'t sleep','couldnt sleep','overslept','late night','insomnia','tired all day'],
+    logs: [],
+    streak: 0,
+    lastLogDate: null
+  },
+  {
+    id: 'aidb',
+    title: 'AIDB / Agentic OS Course',
+    category: 'Learning',
+    description: 'Make weekly progress on AIDB courses, especially the Agentic OS course.',
+    frequency: 7,
+    keywords: ['aidb','agentic os','agentic','course','module','lesson','lecture','studied','study','curriculum'],
+    completeWords: ['completed','finished module','finished lesson','progressed','watched','studied','learned'],
+    missWords: ['skipped','didn\'t study','didnt study','behind','fell behind','no time for the course'],
+    logs: [],
+    streak: 0,
+    lastLogDate: null
+  },
+  {
+    id: 'finance',
+    title: 'Daily Finance Check',
+    category: 'Finance',
+    description: 'Check all financial accounts daily.',
+    frequency: 1,
+    keywords: ['account','accounts','bank','finance','financial','balance','budget','spending','money','checked accounts'],
+    completeWords: ['checked','reviewed','balanced','reconciled','looked at','went through'],
+    missWords: ['didn\'t check','didnt check','forgot to check','skipped accounts','avoided'],
+    logs: [],
+    streak: 0,
+    lastLogDate: null
+  },
+  {
+    id: 'climate',
+    title: 'Climate Healing Project',
+    category: 'Personal',
+    description: 'Define and advance a personal climate-healing initiative (weekly progress).',
+    frequency: 7,
+    keywords: ['climate','environment','environmental','sustainability','carbon','eco','green','planet','heal climate','climate project'],
+    completeWords: ['worked on','made progress','researched','wrote','planned','outlined','defined','built'],
+    missWords: ['didn\'t work on','didnt work on','no progress','stalled','put off','ignored'],
+    logs: [],
+    streak: 0,
+    lastLogDate: null
+  }
+];
+
+const POSITIVE_WORDS = ['great','good','awesome','proud','completed','done','success','win','happy','motivated','energized','accomplished','nailed','crushed','productive','excited','strong','solid','consistent','progress','better','improved','rested','grateful','focused','calm','win'];
+const NEGATIVE_WORDS = ['missed','skipped','failed','bad','tired','lazy','struggled','anxious','stressed','frustrated','behind','procrastinated','forgot','didn\'t','didnt','overwhelmed','exhausted','rough','stuck','off track','discouraged','worried','guilty'];
+
+function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    const fresh = { resolutions: JSON.parse(JSON.stringify(DEFAULT_RESOLUTIONS)), settings: { useApi: false, apiKey: '' } };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+    return fresh;
+  }
+  const data = JSON.parse(raw);
+  if (!data.settings) data.settings = { useApi: false, apiKey: '' };
+  return data;
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+let state = loadData();
+
+// ---------- Helpers ----------
+function daysBetween(dateStr, now = new Date()) {
+  if (!dateStr) return Infinity;
+  const then = new Date(dateStr);
+  const diff = now.setHours(0,0,0,0) - new Date(dateStr).setHours(0,0,0,0);
+  return Math.round(diff / 86400000);
+}
+
+function todayStr() {
+  return new Date().toISOString();
+}
+
+function detectResolution(text) {
+  const lower = text.toLowerCase();
+  let best = null, bestScore = 0;
+  for (const res of state.resolutions) {
+    let score = 0;
+    for (const kw of res.keywords) {
+      if (lower.includes(kw)) score++;
+    }
+    if (score > bestScore) { bestScore = score; best = res; }
+  }
+  return best;
+}
+
+function analyzeSentiment(text) {
+  const lower = text.toLowerCase();
+  let pos = 0, neg = 0;
+  for (const w of POSITIVE_WORDS) if (lower.includes(w)) pos++;
+  for (const w of NEGATIVE_WORDS) if (lower.includes(w)) neg++;
+  const score = pos - neg;
+  let label = 'neutral';
+  if (score > 0) label = 'positive';
+  else if (score < 0) label = 'negative';
+  return { label, pos, neg, score };
+}
+
+function detectCompletion(text, res) {
+  const lower = text.toLowerCase();
+  let completed = null;
+  for (const w of res.missWords) if (lower.includes(w)) completed = false;
+  if (completed === null) {
+    for (const w of res.completeWords) if (lower.includes(w)) completed = true;
+  }
+  return completed; // true, false, or null (unclear)
+}
+
+function updateStreak(res, completed) {
+  const lastDate = res.lastLogDate;
+  const gapDays = daysBetween(lastDate);
+  if (completed === true) {
+    if (gapDays <= res.frequency || res.streak === 0) {
+      res.streak = (res.streak || 0) + 1;
+    } else {
+      res.streak = 1;
+    }
+  } else if (completed === false) {
+    res.streak = 0;
+  }
+  // if completed is null (unclear), streak unchanged
+  res.lastLogDate = todayStr();
+}
+
+function generateFeedback(res, sentiment, completed) {
+  const lines = [];
+  // Streak-based opener
+  if (completed === true) {
+    if (res.streak >= 7) lines.push(`🔥 ${res.streak}-day streak on "${res.title}" — that's real consistency.`);
+    else if (res.streak >= 3) lines.push(`Nice, ${res.streak} in a row on "${res.title}". Momentum is building.`);
+    else lines.push(`Logged as done for "${res.title}". Good start — keep it going.`);
+  } else if (completed === false) {
+    lines.push(`Marked "${res.title}" as missed today — streak reset to 0. That's okay, one day doesn't undo the pattern. Tomorrow's the rebound.`);
+  } else {
+    lines.push(`Got it — logged your update for "${res.title}". Couldn't tell from the wording whether you completed it; streak left unchanged.`);
+  }
+
+  // Sentiment-based reflection
+  if (sentiment.label === 'positive') {
+    lines.push(`Your note reads upbeat (${sentiment.pos} positive cue${sentiment.pos===1?'':'s'} detected). Whatever you're doing here, it's working — worth noting what made today easier.`);
+  } else if (sentiment.label === 'negative') {
+    lines.push(`Your note reads like a tougher day (${sentiment.neg} stress/negative cue${sentiment.neg===1?'':'s'} detected). If this is becoming a pattern for "${res.title}", consider whether the goal needs adjusting rather than just trying harder.`);
+  } else {
+    lines.push(`Your note reads fairly neutral — just a plain log, which is fine.`);
+  }
+
+  return lines.join(' ');
+}
+
+// ---------- Rendering ----------
+function render() {
+  renderGrid();
+  renderBanner();
+  renderSelect();
+  renderWeeklySummary();
+  renderHistory();
+  // settings
+  document.getElementById('useApiToggle').checked = !!state.settings.useApi;
+  document.getElementById('apiKeyInput').value = state.settings.apiKey || '';
+}
+
+function renderGrid() {
+  const grid = document.getElementById('resGrid');
+  grid.innerHTML = '';
+  for (const res of state.resolutions) {
+    const due = daysBetween(res.lastLogDate) > res.frequency;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-title">${res.title}</div>
+        <span class="tag">${res.category}</span>
+      </div>
+      <div class="card-desc">${res.description}</div>
+      <div class="card-stats">
+        <div class="streak ${res.streak ? '' : 'zero'}">${res.streak || 0} day${res.streak===1?'':'s'} streak</div>
+        <div>${due ? `<span class="due-badge">check-in due</span>` : (res.lastLogDate ? 'last: ' + new Date(res.lastLogDate).toLocaleDateString() : 'no logs yet')}</div>
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+function renderBanner() {
+  const due = state.resolutions.filter(r => daysBetween(r.lastLogDate) > r.frequency);
+  const banner = document.getElementById('checkinBanner');
+  const list = document.getElementById('dueList');
+  if (due.length === 0) {
+    banner.classList.remove('show');
+    return;
+  }
+  list.innerHTML = due.map(r => {
+    const days = r.lastLogDate ? daysBetween(r.lastLogDate) : 'never';
+    return `<li><b>${r.title}</b> — ${r.lastLogDate ? 'last logged ' + days + ' day' + (days===1?'':'s') + ' ago (expected every ' + r.frequency + ')' : 'no logs yet'}</li>`;
+  }).join('');
+  banner.classList.add('show');
+}
+
+function renderSelect() {
+  const sel = document.getElementById('logResolution');
+  sel.innerHTML = '<option value="__auto">Auto-detect resolution</option>' +
+    state.resolutions.map(r => `<option value="${r.id}">${r.title}</option>`).join('');
+}
+
+function renderWeeklySummary() {
+  const el = document.getElementById('weeklySummary');
+  const now = new Date();
+  const rows = state.resolutions.map(res => {
+    const weekLogs = res.logs.filter(l => daysBetween(l.date, new Date(now)) <= 7);
+    const pos = weekLogs.filter(l => l.sentiment === 'positive').length;
+    const neg = weekLogs.filter(l => l.sentiment === 'negative').length;
+    const completedCount = weekLogs.filter(l => l.completed === true).length;
+    return `<div class="ws-row">
+      <span>${res.title}</span>
+      <span>${weekLogs.length} log${weekLogs.length===1?'':'s'} · ${completedCount} completed · ${pos} positive / ${neg} negative</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = rows || '<div class="empty">No activity yet.</div>';
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  const allLogs = [];
+  for (const res of state.resolutions) {
+    for (const log of res.logs) {
+      allLogs.push({ ...log, resTitle: res.title });
+    }
+  }
+  allLogs.sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (allLogs.length === 0) {
+    el.innerHTML = '<div class="empty">No entries logged yet — write your first update above.</div>';
+    return;
+  }
+  el.innerHTML = allLogs.slice(0, 20).map(l => `
+    <div class="log-entry">
+      <div class="log-text">${escapeHtml(l.text)}</div>
+      <div class="log-meta">
+        <span>${l.resTitle}</span>
+        <span class="sentiment-pill sentiment-${l.sentiment}">${l.sentiment}</span>
+        <span>${l.completed === true ? '✅ done' : l.completed === false ? '❌ missed' : '— unclear'}</span>
+        <span>${new Date(l.date).toLocaleString()}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ---------- Actions ----------
+async function submitLog() {
+  const input = document.getElementById('logInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const selVal = document.getElementById('logResolution').value;
+  let res = selVal === '__auto' ? detectResolution(text) : state.resolutions.find(r => r.id === selVal);
+  if (!res) {
+    const box = document.getElementById('feedbackBox');
+    box.classList.add('show');
+    box.innerHTML = `<div>Couldn't detect which resolution this relates to from your wording — please pick one from the dropdown next to the button, then click "Analyze & Log" again.</div>`;
+    return;
+  }
+
+  const sentiment = analyzeSentiment(text);
+  const completed = detectCompletion(text, res);
+  updateStreak(res, completed);
+
+  const logEntry = {
+    date: todayStr(),
+    text,
+    sentiment: sentiment.label,
+    completed
+  };
+  res.logs.unshift(logEntry);
+  saveData();
+
+  let feedback = generateFeedback(res, sentiment, completed);
+
+  // Optional API enhancement
+  if (state.settings.useApi && state.settings.apiKey) {
+    document.getElementById('feedbackBox').classList.add('show');
+    document.getElementById('feedbackBox').innerHTML = `<div class="meta">Asking Claude for a deeper reflection...</div>`;
+    try {
+      const apiFeedback = await getApiFeedback(res, text, sentiment, completed);
+      if (apiFeedback) feedback = apiFeedback;
+    } catch (e) {
+      feedback += ` (API feedback unavailable: ${e.message})`;
+    }
+  }
+
+  showFeedback(res, sentiment, completed, feedback);
+  document.getElementById('autoDetectNote').textContent = selVal === '__auto' ? `Detected: ${res.title}` : '';
+  input.value = '';
+  render();
+}
+
+function showFeedback(res, sentiment, completed, feedback) {
+  const box = document.getElementById('feedbackBox');
+  box.classList.add('show');
+  box.innerHTML = `
+    <div>${escapeHtml(feedback)}</div>
+    <div class="meta">
+      <span>Resolution: <b>${res.title}</b></span>
+      <span class="sentiment-pill sentiment-${sentiment.label}">${sentiment.label}</span>
+      <span>${completed === true ? '✅ marked complete' : completed === false ? '❌ marked missed' : '— status unclear'}</span>
+    </div>
+  `;
+}
+
+async function getApiFeedback(res, text, sentiment, completed) {
+  const apiKey = state.settings.apiKey;
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `You are a supportive but honest accountability coach. The user has a resolution: "${res.title}" (${res.description}). Their current streak is ${res.streak} days. They just logged this update: "${text}". Local analysis detected sentiment as ${sentiment.label} and completion status as ${completed === null ? 'unclear' : completed}. In 2-3 sentences, give brief, specific, encouraging-but-honest feedback on this update.`
+      }]
+    })
+  });
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error(`${resp.status} ${errBody.slice(0,100)}`);
+  }
+  const data = await resp.json();
+  return data.content?.[0]?.text || null;
+}
+
+function saveSettings() {
+  state.settings.useApi = document.getElementById('useApiToggle').checked;
+  state.settings.apiKey = document.getElementById('apiKeyInput').value.trim();
+  saveData();
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => { btn.textContent = original; }, 1500);
+}
+
+function resetData() {
+  if (!confirm('This will erase all logged progress and reset to defaults. Continue?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = loadData();
+  render();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'resolution-tracker-export.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+render();
+</script>
+</body>
+</html>
